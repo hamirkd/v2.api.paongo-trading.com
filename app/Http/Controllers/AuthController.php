@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
+use App\Models\PasswordReset;
 use Validator;
 
 
@@ -16,7 +17,7 @@ class AuthController extends Controller
      * @return void
      */
     public function __construct() {
-        $this->middleware('auth:api', ['except' => ['login', 'register']]);
+        $this->middleware('auth:api', ['except' => ['login', 'register','password-forget','password-init','password-verify']]);
     }
 
     /**
@@ -167,6 +168,90 @@ class AuthController extends Controller
             'user' => auth()->user(),
             "role"=>auth()->user()->role
         ]);
+    }
+    
+    /**
+     * Cette fonction permet de generer un token de reinitialisation
+     * de mot de passe
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function generate_password_init_token(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+        
+        $email=$request->input('email');
+        $user = User::all()->where('email',$email);
+        if($user==null){
+            return response()->json([
+                'message' => 'User is not existed',
+                'status' => 404
+            ], 404);
+        }
+        PasswordReset::create(array_merge(
+            $validator->validated(),
+            ['token' => Str::random(99)]
+        ));
+        // Email pour envoyer le lien de reinitialisation
+        
+        return response()->json([
+            'message' => 'A email will sending with the reinitilisation code',
+            'status' => 200
+        ], 200);
+    }
+    
+    /**
+     * Verif if token is enabled
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function verif_token_enabled_to_init_password(Request $request) {
+        $validator = Validator::make($request->all(), [
+            'token' => 'required|string|between:2,100'
+        ]);
+        $token=$request->input('token');
+        $passwordReset = PasswordReset::all()->where('token',$token);
+        if($passwordReset==null){
+            return response()->json([
+                "message"=>"Bad token",
+                "status"=>400
+            ],400);
+        }
+        
+        return response()->json([
+            'message' => 'Good token',
+            'email' => $passwordReset->email,
+            "status"=>200
+        ], 200);
+    }
+
+     /**
+     * Init user password.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function reset_password_init(Request $request) {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email',
+            'password' => 'required|string|confirmed|min:6'
+        ]);
+
+        if($validator->fails()){
+            return response()->json($validator->errors()->toJson(), 400);
+        }
+        $user = User::all()->where('email',$request->email);
+        $user->password = bcrypt($request->password);
+        $user->save();
+        $token=$request->input('token');
+        PasswordReset::all()->where('token',$request->token)->delete();
+        // Envoie un mail pour informer que le mot de passe a été changé
+        return response()->json([
+            'message' => 'Password is updated',
+            "status"=>201
+        ], 201);
     }
 
 }

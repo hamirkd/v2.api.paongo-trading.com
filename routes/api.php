@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\AchatController;
 
 /*
@@ -16,6 +17,9 @@ use App\Http\Controllers\AchatController;
 |
 */
 
+Route::post('/password-forget', [PasswordResetController::class, 'generate_password_init_token']);
+Route::post('/password-verify', [PasswordResetController::class, 'verif_token_enabled_to_init_password']);
+Route::post('/password-init', [PasswordResetController::class, 'reset_password_init']);
 Route::group([
     'middleware' => 'api',
     'prefix' => 'auth'
@@ -25,8 +29,8 @@ Route::group([
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
-    Route::get('/user-profile', [AuthController::class, 'userProfile']);    
 });
+
 
 Route::middleware('auth:api')->group(function() {
     Route::apiResource('titres', 'App\Http\Controllers\TitreController');
